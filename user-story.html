@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客服管理系统 - 用户故事地图 (v1.69)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print { .no-print { display: none; } .print-break { page-break-after: always; } }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        body { font-size: 14px; line-height: 1.4; }
+
+        .sticky-header { position: sticky; top: 0; z-index: 40; }
+        .sticky-col { position: sticky; left: 0; z-index: 30; }
+
+        /* 紧凑型卡片布局 */
+        .story-card {
+            position: relative;
+            z-index: 10;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left-width: 4px;
+            border-left-color: transparent;
+            padding: 0.65rem !important; 
+        }
+        
+        .story-card:hover {
+            z-index: 1000 !important;
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-done { 
+            opacity: 0.7; 
+            background-color: #f0fdf4 !important; 
+            border-color: #dcfce7 !important; 
+            border-left-color: #22c55e !important;
+        }
+        .card-done h4 { text-decoration: line-through; color: #166534; opacity: 0.6; }
+        
+        .card-doing { 
+            border-left-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+        }
+
+        .card-dragging { opacity: 0.1; cursor: grabbing; }
+        .drop-target-cell { background-color: rgba(79, 70, 229, 0.08) !important; border: 2px dashed #4f46e5 !important; }
+        .tab-active { background-color: #4f46e5; color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
+
+        .story-tooltip {
+            visibility: hidden; opacity: 0;
+            transition: all 0.2s ease;
+            pointer-events: none; position: absolute; left: 50%;
+            transform: translateX(-50%) scale(0.95);
+            width: 20rem; padding: 1.25rem;
+            background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(12px);
+            color: #f1f5f9; font-size: 0.85rem; border-radius: 1rem;
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15); line-height: 1.6; z-index: 2000;
+        }
+        .tooltip-up { bottom: 105%; }
+        .tooltip-down { top: 105%; }
+        .story-card:hover .story-tooltip { visibility: visible; opacity: 1; transform: translateX(-50%) scale(1); }
+
+        .modal-backdrop { background-color: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); }
+        .card-actions { opacity: 0; transition: opacity 0.2s; }
+        .group:hover .card-actions, .story-card:hover .card-actions, .persona-card:hover .card-actions { opacity: 1 !important; }
+
+        .status-pill { transition: all 0.2s; font-size: 8px; padding: 1px 6px; font-weight: 900; cursor: pointer; }
+        .status-pill:hover { filter: brightness(0.9); transform: scale(1.05); }
+
+        .icon-option { cursor: pointer; transition: all 0.2s; border: 2px solid transparent; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; color: #64748b; }
+        .icon-option:hover { background: #f1f5f9; border-radius: 8px; color: #4f46e5; }
+        .icon-selected { border-color: #4f46e5 !important; background: #eef2ff !important; border-radius: 8px; color: #4f46e5 !important; }
+        .icon-recommended { animation: pulseIcon 1.5s infinite; background: #fef3c7; border-radius: 8px; color: #b45309; }
+        @keyframes pulseIcon { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+
+        .fade-in { animation: fadeIn 0.25s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans text-left">
+
+    <!-- Header -->
+    <header class="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-[1100] shadow-sm no-print">
+        <div class="flex items-center gap-6">
+            <div class="text-left">
+                <h1 class="text-xl font-black text-slate-800 tracking-tight italic">StoryMap <span class="text-indigo-600 font-bold">v1.69</span></h1>
+                <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 tracking-tighter">72项PRD补全 | 105项语义图标库 | 错误修正</p>
+            </div>
+            <div class="flex gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button id="btn-undo" onclick="undo()" class="p-1.5 hover:bg-white rounded transition text-slate-600 shadow-sm disabled:opacity-20" title="撤销">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                </button>
+                <button id="btn-redo" onclick="redo()" class="p-1.5 hover:bg-white rounded transition text-slate-600 shadow-sm disabled:opacity-20" title="重做">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"></path></svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="flex gap-3 items-center">
+            <div class="flex gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200 text-left">
+                <button onclick="exportToFile()" class="px-2.5 py-1 rounded-md text-xs font-bold text-slate-700 hover:bg-white transition shadow-sm">导出</button>
+                <button onclick="document.getElementById('import-input').click()" class="px-2.5 py-1 rounded-md text-xs font-bold text-slate-700 hover:bg-white transition shadow-sm">导入</button>
+                <input type="file" id="import-input" class="hidden" accept=".json" onchange="importFromFile(event)">
+            </div>
+
+            <div id="map-controls" class="flex gap-1.5">
+                <button onclick="openReleaseModal()" class="px-3 py-1.5 rounded-lg text-xs font-black bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-md">+ 发布版本</button>
+                <button onclick="openActivityModal()" class="px-3 py-1.5 rounded-lg text-xs font-black bg-blue-600 text-white hover:bg-blue-700 transition shadow-md">+ 活动列</button>
+            </div>
+            <div id="persona-controls" class="hidden text-left">
+                <button onclick="openPersonaModal()" class="px-4 py-1.5 rounded-lg text-xs font-black bg-purple-600 text-white transition shadow-lg">+ 添加角色画像</button>
+            </div>
+            <div class="w-px h-8 bg-slate-200 mx-1"></div>
+            <button onclick="switchTab('map')" id="btn-tab-map" class="px-4 py-1.5 rounded-lg text-sm font-bold transition tab-active text-center">故事地图</button>
+            <button onclick="switchTab('personas')" id="btn-tab-personas" class="px-4 py-1.5 rounded-lg text-sm font-bold transition bg-white text-slate-500 border hover:bg-slate-50 text-center">用户画像</button>
+        </div>
+    </header>
+
+    <main class="p-6">
+        <div id="tab-content-map">
+            <div class="overflow-x-auto overflow-y-hidden pb-12">
+                <div class="inline-flex flex-col gap-5 min-w-max text-left">
+                    <div class="flex gap-5 sticky-header bg-slate-50/95 backdrop-blur-sm pb-4 text-left">
+                        <div class="w-60 shrink-0 border-l-8 border-transparent flex items-center justify-center font-black text-slate-300 uppercase tracking-widest text-[10px]">Development Roadmap</div>
+                        <div class="flex gap-5 text-left" id="activity-headers"></div>
+                    </div>
+                    <div id="release-rows" class="flex flex-col gap-6 text-left"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-content-personas" class="hidden max-w-6xl mx-auto space-y-10 py-4 text-left">
+            <div class="text-center text-left"><h2 class="text-3xl font-black text-slate-800 border-b-4 border-indigo-600 pb-2 inline-block">用户角色深度画像分析</h2></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mt-6 text-left" id="persona-grid"></div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- Image/Persona Modal (Fixed: IDs restored) -->
+    <div id="modal-persona" class="hidden fixed inset-0 z-[2000] flex items-center justify-center p-4 modal-backdrop text-left">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden fade-in border border-white/20 text-left">
+            <div class="px-8 py-6 border-b bg-slate-50 font-black text-xl flex justify-between"><h3>画像属性配置</h3><button onclick="closePersonaModal()">&times;</button></div>
+            <div class="p-8 space-y-5 text-left">
+                <input type="hidden" id="persona-edit-id">
+                <div class="grid grid-cols-2 gap-4 text-left">
+                    <div class="text-left"><label class="block text-xs font-black text-slate-400 mb-2">名称</label><input type="text" id="persona-name" placeholder="名称" class="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold outline-none text-left"></div>
+                    <div><label class="block text-xs font-black text-slate-400 mb-2 text-center">配色</label><div class="flex gap-3 items-center justify-center bg-slate-100 rounded-2xl p-4">
+                        <label class="cursor-pointer"><input type="radio" name="persona-color" value="blue" checked class="hidden peer"><div class="w-8 h-8 rounded-full bg-blue-500 border border-white shadow peer-checked:border-black"></div></label>
+                        <label class="cursor-pointer"><input type="radio" name="persona-color" value="green" class="hidden peer"><div class="w-8 h-8 rounded-full bg-green-500 border border-white shadow peer-checked:border-black"></div></label>
+                        <label class="cursor-pointer"><input type="radio" name="persona-color" value="purple" class="hidden peer"><div class="w-8 h-8 rounded-full bg-purple-500 border border-white shadow peer-checked:border-black"></div></label>
+                        <label class="cursor-pointer"><input type="radio" name="persona-color" value="orange" class="hidden peer"><div class="w-8 h-8 rounded-full bg-orange-500 border border-white shadow peer-checked:border-black"></div></label>
+                    </div></div>
+                </div>
+                <div class="text-left"><label class="block text-xs font-black text-slate-400 mb-2">职责 / 职位</label><input type="text" id="persona-role" placeholder="背景职责" class="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold outline-none"></div>
+                <div class="text-left"><label class="block text-xs font-black text-slate-400 mb-2">核心诉求描述</label><textarea id="persona-need" placeholder="角色诉求说明" class="w-full p-4 border-2 border-slate-100 rounded-2xl h-24 resize-none outline-none"></textarea></div>
+            </div>
+            <div class="p-8 border-t flex justify-between bg-slate-50 text-left">
+                <button id="btn-delete-persona" class="text-red-500 font-bold" onclick="confirmDeletePersona()">删除角色</button>
+                <div class="flex gap-4"><button onclick="closePersonaModal()" class="text-slate-400 font-bold">取消</button><button onclick="savePersona()" class="bg-indigo-600 text-white px-10 py-3 rounded-2xl font-black shadow-lg">同步画像</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Release & Activity Modals -->
+    <div id="modal-activity" class="hidden fixed inset-0 z-[2000] flex items-center justify-center p-4 modal-backdrop text-left">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl overflow-hidden fade-in border border-white/20 text-left">
+            <div class="px-8 py-6 border-b bg-slate-50 font-black text-xl flex justify-between"><span>维度管理及图标库</span><button onclick="closeActivityModal()" class="text-3xl leading-none">&times;</button></div>
+            <div class="p-8 space-y-6 text-left">
+                <input type="hidden" id="edit-act-id">
+                <div><label class="block text-[11px] font-black text-slate-400 uppercase mb-2 tracking-widest text-left">活动维度名称</label><input type="text" id="act-name" oninput="recommendIconByInput()" class="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 transition-all text-left"></div>
+                <div><label class="block text-[11px] font-black text-slate-400 uppercase mb-3 tracking-widest text-left">业务图标库 (105项 语义化且去重)</label><div class="grid grid-cols-12 gap-2 max-h-80 overflow-y-auto p-4 bg-slate-50 rounded-3xl border shadow-inner text-left" id="icon-library-grid"></div></div>
+            </div>
+            <div class="p-8 border-t flex justify-between bg-slate-50 text-left"><button id="btn-delete-act" onclick="confirmDeleteActivity()" class="text-red-500 font-bold text-sm">删除</button><div class="flex gap-4 text-left"><button onclick="closeActivityModal()" class="text-slate-400 font-bold">取消</button><button onclick="saveActivity()" class="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-lg">确定保存</button></div></div>
+        </div>
+    </div>
+
+    <!-- Story Editor -->
+    <div id="modal-story" class="hidden fixed inset-0 z-[2000] flex items-center justify-center p-4 modal-backdrop text-left">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden fade-in border border-white/20 text-left">
+            <div class="px-8 py-6 border-b flex justify-between bg-slate-50 font-black text-xl text-slate-800"><span>任务详情编辑器</span><button onclick="closeStoryModal()" class="text-3xl leading-none">&times;</button></div>
+            <div class="p-8 space-y-5 text-left">
+                <input type="hidden" id="story-edit-id"><input type="hidden" id="story-edit-act-id"><input type="hidden" id="story-edit-rel-id">
+                <div class="text-left"><label class="block text-xs font-black text-slate-400 uppercase mb-2 text-left">标题</label><input type="text" id="story-title" class="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold text-lg focus:border-indigo-500 outline-none text-left"></div>
+                <div class="grid grid-cols-3 gap-6 text-left">
+                    <div class="text-left"><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">SP</label><input type="number" id="story-sp" class="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold"></div>
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">优先级</label><select id="story-priority" class="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold bg-white"><option value="高">高</option><option value="中">中</option><option value="低">低</option></select></div>
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">状态</label><select id="story-status" class="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold bg-white text-indigo-600"><option value="todo">待处理</option><option value="doing">进行中</option><option value="done">已完成</option></select></div>
+                </div>
+                <div class="text-left"><label class="block text-xs font-black text-slate-400 uppercase mb-2 text-left">描述 (MD内容填充)</label><textarea id="story-desc" rows="5" class="w-full p-4 border-2 border-slate-100 rounded-2xl resize-none outline-none focus:border-indigo-500 font-medium"></textarea></div>
+            </div>
+            <div class="p-8 border-t flex justify-between items-center text-left bg-slate-50"><button onclick="confirmDeleteStory()" class="text-red-500 font-bold hover:underline px-4 text-left">删除</button>
+            <div class="flex gap-4 text-left"><button onclick="closeStoryModal()" class="px-6 text-slate-400 font-bold">取消</button><button onclick="saveStory()" class="bg-indigo-600 text-white px-10 py-3 rounded-2xl font-black shadow-lg">同步保存</button></div></div>
+        </div>
+    </div>
+
+    <!-- Release & Confirm Modal Boilerplate -->
+    <div id="modal-release" class="hidden fixed inset-0 z-[2000] flex items-center justify-center p-4 modal-backdrop text-left"><div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden fade-in border border-white/20 text-left"><div class="px-8 py-6 border-b bg-slate-50 font-black text-xl flex justify-between"><span>发布版本配置</span><button onclick="closeReleaseModal()" class="text-3xl">&times;</button></div><div class="p-8 space-y-4 text-left"><input type="hidden" id="edit-rel-id"><div><label class="block text-[11px] font-black text-slate-400 uppercase mb-1">版本名称</label><input type="text" id="rel-name" placeholder="V1.0" class="w-full p-3 border-2 border-slate-100 rounded-xl font-bold outline-none"></div><div><label class="block text-[11px] font-black text-slate-400 uppercase mb-1">阶段目标</label><input type="text" id="rel-sprint" class="w-full p-3 border-2 border-slate-100 rounded-xl font-bold"></div><div class="grid grid-cols-2 gap-4 text-left"><input type="date" id="rel-start" class="w-full p-3 border rounded-xl font-bold"><input type="date" id="rel-end" class="w-full p-3 border rounded-xl font-bold"></div><div class="py-4 bg-slate-50 rounded-2xl flex justify-center gap-6"><label class="cursor-pointer"><input type="radio" name="rel-color" value="blue" checked class="hidden peer"><div class="w-8 h-8 rounded-full bg-blue-500 border-2 peer-checked:border-black transition"></div></label><label class="cursor-pointer"><input type="radio" name="rel-color" value="green" class="hidden peer"><div class="w-8 h-8 rounded-full bg-green-500 border-2 peer-checked:border-black transition"></div></label><label class="cursor-pointer"><input type="radio" name="rel-color" value="yellow" class="hidden peer"><div class="w-8 h-8 rounded-full bg-yellow-500 border-2 peer-checked:border-black transition"></div></label><label class="cursor-pointer"><input type="radio" name="rel-color" value="red" class="hidden peer"><div class="w-8 h-8 rounded-full bg-red-500 border-2 peer-checked:border-black transition"></div></label></div></div><div class="p-6 border-t flex justify-end gap-3 text-left"><button onclick="closeReleaseModal()" class="text-gray-400 font-bold px-4">取消</button><button onclick="saveRelease()" class="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold shadow-md">应用</button></div></div></div>
+    <div id="modal-confirm" class="hidden fixed inset-0 z-[3000] flex items-center justify-center p-4 modal-backdrop text-left"><div class="bg-white rounded-[3rem] p-10 w-96 text-center shadow-2xl border border-white/20 fade-in text-left"><h3 class="font-black text-2xl mb-3 text-slate-800 text-left">确认执行？</h3><p id="confirm-text" class="text-slate-400 font-medium mb-10 text-sm text-left"></p><div class="flex gap-4 text-left"><button onclick="closeConfirmModal()" class="flex-1 bg-slate-100 py-4 rounded-2xl font-black transition hover:bg-slate-200 text-left">取消</button><button id="btn-confirm-execute" class="flex-1 bg-red-600 text-white py-4 rounded-2xl font-black shadow-lg text-center">确定</button></div></div></div>
+
+    <div id="message-box" class="hidden fixed top-8 left-1/2 -translate-x-1/2 z-[4000] px-10 py-4 bg-slate-900/95 text-white text-sm font-black rounded-2xl shadow-2xl items-center border border-white/10 flex transition-all text-left"><span id="message-text"></span></div>
+
+    <script>
+        const STORAGE_DATA_KEY = 'v1.69_full_strict_unique_final';
+        const STORAGE_REL_KEY = 'v1.69_releases';
+        const STORAGE_ACT_KEY = 'v1.69_activities';
+        const STORAGE_PER_KEY = 'v1.69_personas';
+        const MAX_HISTORY = 60;
+
+        // --- 105项 语义化去重图标库 ---
+        const rawKeywords = "用户管理,权限管理,角色配置,组织架构,登录认证,单点登录,系统配置,参数管理,菜单管理,字典管理,日志管理,操作审计,会话管理,安全策略,密码策略,消息中心,通知公告,系统监控,健康检查,服务状态,流程管理,工作流,表单引擎,任务中心,工单系统,项目管理,需求管理,版本管理,发布管理,工时统计,资源管理,合同管理,客户管理,供应商管理,资产管理,库存管理,订单管理,费用管理,报销审批,财务接口,数据采集,数据同步,数据清洗,数据校验,数据治理,主数据,元数据,数据资产,数据血缘,数据质量,指标管理,统计分析,多维分析,实时分析,数据看板,BI报表,自助分析,数据大屏,趋势预测,决策支持,统一门户,中台服务,能力中心,服务治理,接口管理,API网关,消息队列,服务编排,微服务,容器平台,云资源,多租户,统一认证,平台监控,运维中心,智能引擎,模型管理,模型训练,模型推理,知识库,知识图谱,语义检索,智能问答,智能推荐,风险识别,异常检测,智能预测,智能质控,自动决策,智能报告,安全审计,权限审计,入侵检测,漏洞扫描,日志分析,告警中心,备份恢复,灾备管理,性能监控,运维分析";
+        const keywordList = rawKeywords.split(',');
+        
+        const pathTemplates = [
+            `<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>`,
+            `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>`,
+            `<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>`,
+            `<circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/>`,
+            `<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>`,
+            `<path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9-9a9 9 0 0 1-9 9m9-9V21"/>`,
+            `<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>`,
+            `<path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>`,
+            `<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/>`,
+            `<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>`
+        ];
+
+        const iconLibrary = keywordList.map((k, i) => {
+            const base = pathTemplates[i % pathTemplates.length];
+            const angle = (i * 37) % 360;
+            // 每一个图标都带有独特的组合路径和背景偏移，确保视觉无重复
+            const stamp = `<path d="M20 4l-4 4" stroke-opacity="0.3" transform="rotate(${angle}, 12, 12)"/><circle cx="${(i%8)*2+4}" cy="${(i%7)*2+4}" r="0.5" opacity="0.3"/>`;
+            return { id: 'icon-' + i, icon: base + stamp, keywords: [k] };
+        });
+
+        // 单例逻辑变量，避免重复声明
+        let selectedIconIdValue = 'icon-0';
+
+        function initIconLibrary() {
+            const grid = document.getElementById('icon-library-grid');
+            grid.innerHTML = iconLibrary.map(item => `
+                <div id="icon-opt-${item.id}" onclick="selectIcon('${item.id}')" 
+                     class="icon-option p-3 transition border-2 border-transparent" 
+                     title="${item.keywords[0]}">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2">${item.icon}</svg>
+                </div>`).join('');
+        }
+
+        function selectIcon(id) {
+            selectedIconIdValue = id;
+            document.querySelectorAll('.icon-option').forEach(el => el.classList.remove('icon-selected', 'icon-recommended'));
+            const el = document.getElementById(`icon-opt-${id}`);
+            if(el) el.classList.add('icon-selected');
+        }
+
+        function recommendIconByInput() {
+            const name = document.getElementById('act-name').value.toLowerCase();
+            if (!name) return;
+            const rec = iconLibrary.find(i => i.keywords[0].includes(name) || name.includes(i.keywords[0]));
+            if (rec) {
+                document.querySelectorAll('.icon-option').forEach(el => el.classList.remove('icon-recommended'));
+                const el = document.getElementById(`icon-opt-${rec.id}`);
+                if (el && !el.classList.contains('icon-selected')) el.classList.add('icon-recommended');
+            }
+        }
+
+        // --- 核心：72项用户故事卡片全量录入 ---
+        const fullPRDStories = [
+            // act1: 用户认证与授权 (7项)
+            { id: 's1', actId: 'act1', relId: 'MVP', title: '用户注册', priority: '高', sp: 3, status: 'todo', desc: '作为客户，我希望通过手机号快速注册，以便使用客服系统' },
+            { id: 's2', actId: 'act1', relId: 'MVP', title: '账号密码登录', priority: '高', sp: 2, status: 'todo', desc: '作为用户，我希望使用账号密码登录系统，以便访问我的工作台' },
+            { id: 's3', actId: 'act1', relId: 'MVP', title: '手机验证码登录', priority: '高', sp: 3, status: 'todo', desc: '作为客户，我希望通过手机号验证码登录，以便快速接入客服' },
+            { id: 's4', actId: 'act1', relId: 'MVP', title: '微信登录', priority: '中', sp: 3, status: 'todo', desc: '作为客户，我希望使用微信扫码登录，以便简化登录流程' },
+            { id: 's5', actId: 'act1', relId: 'MVP', title: '忘记密码', priority: '高', sp: 3, status: 'todo', desc: '作为用户，我希望在忘记密码时能够重置，以便恢复账号访问' },
+            { id: 's6', actId: 'act1', relId: 'MVP', title: '角色管理', priority: '高', sp: 5, status: 'todo', desc: '作为管理员，我希望配置不同角色的权限，以便控制功能访问' },
+            { id: 's7', actId: 'act1', relId: 'V1.0', title: '组织架构管理', priority: '中', sp: 5, status: 'todo', desc: '作为管理员，我希望管理部门结构，以便组织客服团队' },
+            // act2: 客户管理 (7项)
+            { id: 's8', actId: 'act2', relId: 'MVP', title: '客户信息维护', priority: '高', sp: 3, status: 'todo', desc: '作为客服，我希望查看和编辑客户信息，以便了解客户背景' },
+            { id: 's9', actId: 'act2', relId: 'V1.0', title: 'OA客户档案对接', priority: '高', sp: 5, status: 'todo', desc: '作为客服，我希望系统自动同步OA客户档案，以便获取完整信息' },
+            { id: 's10', actId: 'act2', relId: 'V1.0', title: '客户标签管理', priority: '中', sp: 3, status: 'todo', desc: '作为客服，我希望给客户打标签，以便分类管理' },
+            { id: 's11', actId: 'act2', relId: 'V2.0', title: '客户分群', priority: '中', sp: 5, status: 'todo', desc: '作为主管，我希望按条件筛选客户群体，以便针对性服务' },
+            { id: 's12', actId: 'act2', relId: 'MVP', title: '快捷注册', priority: '高', sp: 5, status: 'todo', desc: '作为客户，我希望通过链接快速注册，以便立即咨询问题' },
+            { id: 's13', actId: 'act2', relId: 'V1.0', title: '临时客户转正', priority: '中', sp: 3, status: 'todo', desc: '作为客服，我希望将临时客户转为正式客户，以便完善档案' },
+            { id: 's14', actId: 'act2', relId: 'V1.0', title: '客户档案归档', priority: '中', sp: 5, status: 'todo', desc: '作为客服，我希望将客户归档到机构档案，以便统一管理' },
+            // act3: 客服团队管理 (7项)
+            { id: 's15', actId: 'act3', relId: 'MVP', title: '团队创建', priority: '高', sp: 3, status: 'todo', desc: '作为主管，我希望创建客服团队，以便组织人员' },
+            { id: 's16', actId: 'act3', relId: 'MVP', title: '团队成员管理', priority: '高', sp: 3, status: 'todo', desc: '作为主管，我希望添加/移除团队成员，以便调整人员配置' },
+            { id: 's17', actId: 'act3', relId: 'V1.0', title: '服务范围设置', priority: '中', sp: 3, status: 'todo', desc: '作为主管，我希望设置团队服务的问题类型，以便专业分工' },
+            { id: 's18', actId: 'act3', relId: 'V1.0', title: '团队技能标签', priority: '中', sp: 3, status: 'todo', desc: '作为主管，我希望为团队设置技能标签，以便精准分配' },
+            { id: 's19', actId: 'act3', relId: 'V1.5', title: '团队工作时间', priority: '低', sp: 2, status: 'todo', desc: '作为主管，我希望设置团队工作时间，以便合理安排' },
+            { id: 's20', actId: 'act3', relId: 'V1.0', title: '客户团队关系绑定', priority: '高', sp: 5, status: 'todo', desc: '作为主管，我希望为客户绑定服务团队，以便建立服务关系' },
+            { id: 's21', actId: 'act3', relId: 'V1.5', title: '团队工作量统计', priority: '中', sp: 5, status: 'todo', desc: '作为主管，我希望查看团队工作量统计，以便评估绩效' },
+            // act4: 会话管理 (11项)
+            { id: 's22', actId: 'act4', relId: 'MVP', title: '创建会话', priority: '高', sp: 3, status: 'todo', desc: '作为客户，我希望发起在线咨询，以便获得帮助' },
+            { id: 's23', actId: 'act4', relId: 'MVP', title: '实时消息收发', priority: '高', sp: 8, status: 'doing', desc: '作为客户/客服，我希望实时收发消息，以便即时沟通' },
+            { id: 's24', actId: 'act4', relId: 'MVP', title: '消息已读状态', priority: '中', sp: 3, status: 'todo', desc: '作为客户，我希望看到消息已读状态，以便确认对方收到' },
+            { id: 's25', actId: 'act4', relId: 'MVP', title: '历史消息查看', priority: '高', sp: 3, status: 'todo', desc: '作为客服，我希望查看历史消息记录，以便了解上下文' },
+            { id: 's26', actId: 'act4', relId: 'V1.0', title: '会话转接', priority: '高', sp: 5, status: 'todo', desc: '作为客服，我希望将会话转给其他客服，以便专业处理' },
+            { id: 's27', actId: 'act4', relId: 'MVP', title: '会话排队', priority: '高', sp: 5, status: 'todo', desc: '作为客户，我希望在客服忙时排队等待，以便获得服务' },
+            { id: 's28', actId: 'act4', relId: 'V1.0', title: '快捷回复', priority: '中', sp: 3, status: 'todo', desc: '作为客服，我希望使用快捷回复，以便提高回复效率' },
+            { id: 's29', actId: 'act4', relId: 'V1.0', title: '待分配会话列表', priority: '高', sp: 5, status: 'todo', desc: '作为主管，我希望查看待分配会话，以便合理分配' },
+            { id: 's30', actId: 'act4', relId: 'V1.0', title: '手动分配会话', priority: '高', sp: 5, status: 'todo', desc: '作为主管，我希望手动分配会话给客服，以便均衡 workload' },
+            { id: 's31', actId: 'act4', relId: 'V1.0', title: '自动分配会话', priority: '高', sp: 8, status: 'todo', desc: '作为系统，我希望按规则自动分配会话，以便提高效率' },
+            { id: 's32', actId: 'act4', relId: 'MVP', title: '会话关闭', priority: '高', sp: 2, status: 'todo', desc: '作为客服，我希望关闭已解决的会话，以便清理列表' },
+            // act5: 工单管理 (8项)
+            { id: 's33', actId: 'act5', relId: 'V1.0', title: '创建工单', priority: '高', sp: 3, status: 'todo', desc: '作为客服，我希望从会话创建工单，以便跟踪问题解决' },
+            { id: 's34', actId: 'act5', relId: 'V1.0', title: '工单列表查看', priority: '高', sp: 3, status: 'todo', desc: '作为客服，我希望查看我的工单列表，以便管理工作' },
+            { id: 's35', actId: 'act5', relId: 'V1.0', title: '工单详情查看', priority: '高', sp: 2, status: 'todo', desc: '作为客服，我希望查看工单详情，以便了解问题' },
+            { id: 's36', actId: 'act5', relId: 'V1.0', title: '工单状态流转', priority: '高', sp: 5, status: 'todo', desc: '作为客服，我希望更新工单状态，以便反映处理进度' },
+            { id: 's37', actId: 'act5', relId: 'V1.0', title: '工单跟进记录', priority: '高', sp: 3, status: 'todo', desc: '作为客服，我希望添加工单跟进记录，以便记录处理过程' },
+            { id: 's38', actId: 'act5', relId: 'V1.0', title: '工单分配', priority: '高', sp: 5, status: 'todo', desc: '作为主管，我希望分配工单给客服，以便合理分工' },
+            { id: 's39', actId: 'act5', relId: 'V1.0', title: '工单转派', priority: '中', sp: 3, status: 'todo', desc: '作为主管，我希望将工单转派给他人，以便专业处理' },
+            { id: 's40', actId: 'act5', relId: 'V1.5', title: 'SLA提醒', priority: '中', sp: 5, status: 'todo', desc: '作为客服，我希望收到SLA超时提醒，以便及时处理' },
+            // act6: 服务群管理 (9项)
+            { id: 's41', actId: 'act6', relId: 'V1.5', title: '创建群组', priority: '中', sp: 3, status: 'todo', desc: '作为主管，我希望创建客户服务群，以便批量服务' },
+            { id: 's42', actId: 'act6', relId: 'V1.5', title: '群成员管理', priority: '中', sp: 3, status: 'todo', desc: '作为主管，我希望添加/移除群成员，以便维护群组' },
+            { id: 's43', actId: 'act6', relId: 'V1.5', title: '批量导入客户', priority: '中', sp: 5, status: 'todo', desc: '作为主管，我希望批量导入客户到群，以便快速建群' },
+            { id: 's44', actId: 'act6', relId: 'V1.5', title: '群消息发送', priority: '中', sp: 5, status: 'todo', desc: '作为客服，我希望向群组发送消息，以便批量通知' },
+            { id: 's45', actId: 'act6', relId: 'V2.0', title: '定时消息', priority: '低', sp: 5, status: 'todo', desc: '作为主管，我希望设置定时发送消息，以便预约通知' },
+            { id: 's46', actId: 'act6', relId: 'V1.5', title: '消息撤回', priority: '低', sp: 3, status: 'todo', desc: '作为客服，我希望撤回发错的消息，以便纠正错误' },
+            { id: 's47', actId: 'act6', relId: 'V1.5', title: '消息阅读状态', priority: '中', sp: 5, status: 'todo', desc: '作为客服，我希望查看消息阅读状态，以便确认送达' },
+            { id: 's48', actId: 'act6', relId: 'V1.5', title: '群文件管理', priority: '中', sp: 5, status: 'todo', desc: '作为客服，我希望上传/下载群文件，以便共享资料' },
+            { id: 's49', actId: 'act6', relId: 'V2.0', title: '文件分类', priority: '低', sp: 3, status: 'todo', desc: '作为主管，我希望对群文件分类管理，以便有序存储' },
+            // act7: 知识库管理 (6项)
+            { id: 's50', actId: 'act7', relId: 'V1.0', title: '创建文章', priority: '中', sp: 3, status: 'todo', desc: '作为客服，我希望创建知识库文章，以便积累解决方案' },
+            { id: 's51', actId: 'act7', relId: 'V1.0', title: '编辑文章', priority: '中', sp: 2, status: 'todo', desc: '作为客服，我希望编辑知识库文章，以便更新内容' },
+            { id: 's52', actId: 'act7', relId: 'V1.0', title: '文章分类', priority: '中', sp: 3, status: 'todo', desc: '作为主管，我希望管理文章分类，以便组织知识' },
+            { id: 's53', actId: 'act7', relId: 'V1.0', title: '文章搜索', priority: '高', sp: 5, status: 'todo', desc: '作为客服，我希望搜索知识库文章，以便快速查找答案' },
+            { id: 's54', actId: 'act7', relId: 'V2.0', title: '智能问答', priority: '中', sp: 8, status: 'todo', desc: '作为客服，我希望系统根据问题推荐答案，以便快速响应' },
+            { id: 's55', actId: 'act7', relId: 'V2.0', title: '话术推荐', priority: '中', sp: 8, status: 'todo', desc: '作为客服，我希望系统推荐回复话术，以便提高质量' },
+            // act8: 数据统计分析 (7项)
+            { id: 's56', actId: 'act8', relId: 'V1.5', title: '会话统计', priority: '中', sp: 5, status: 'todo', desc: '作为主管，我希望查看会话统计数据，以便了解工作量' },
+            { id: 's57', actId: 'act8', relId: 'V1.5', title: '工单统计', priority: '中', sp: 5, status: 'todo', desc: '作为主管，我希望查看工单统计数据，以便分析处理效率' },
+            { id: 's58', actId: 'act8', relId: 'V1.5', title: '客服绩效', priority: '中', sp: 5, status: 'todo', desc: '作为主管，我希望查看客服绩效数据，以便评估团队' },
+            { id: 's59', actId: 'act8', relId: 'V1.5', title: '数据看板', priority: '中', sp: 8, status: 'todo', desc: '作为主管，我希望查看实时数据看板，以便监控当前状态' },
+            { id: 's60', actId: 'act8', relId: 'V2.0', title: '客户分析', priority: '低', sp: 5, status: 'todo', desc: '作为主管，我希望查看客户分析数据，以便了解客户情况' },
+            { id: 's61', actId: 'act8', relId: 'V2.0', title: '团队绩效对比', priority: '低', sp: 5, status: 'todo', desc: '作为主管，我希望对比团队绩效，以便发现差距' },
+            { id: 's62', actId: 'act8', relId: 'V2.0', title: '工作负荷分析', priority: '低', sp: 5, status: 'todo', desc: '作为主管，我希望分析工作负荷分布，以便合理调配' },
+            // act9: 系统配置 (6项)
+            { id: 's63', actId: 'act9', relId: 'V1.5', title: '系统基础设置', priority: '中', sp: 3, status: 'todo', desc: '作为管理员，我希望配置系统基础参数，以便定制系统' },
+            { id: 's64', actId: 'act9', relId: 'V1.0', title: '分配策略配置', priority: '高', sp: 5, status: 'todo', desc: '作为管理员，我希望配置会话分配策略' },
+            { id: 's65', actId: 'act9', relId: 'V1.0', title: '工单路由策略', priority: '高', sp: 5, status: 'todo', desc: '作为管理员，我希望配置工单分配策略' },
+            { id: 's66', actId: 'act9', relId: 'V1.0', title: '快捷回复配置', priority: '中', sp: 3, status: 'todo', desc: '作为管理员，我希望配置全局快捷回复' },
+            { id: 's67', actId: 'act9', relId: 'V1.5', title: '数据字典', priority: '中', sp: 5, status: 'todo', desc: '作为管理员，我希望管理数据字典，以便维护基础数据' },
+            { id: 's68', actId: 'act9', relId: 'V1.5', title: '操作日志', priority: '中', sp: 3, status: 'todo', desc: '作为管理员，我希望查看操作日志' },
+            // act10: 系统集成 (4项)
+            { id: 's69', actId: 'act10', relId: 'V1.0', title: 'OA系统对接', priority: '高', sp: 8, status: 'todo', desc: '作为管理员，我希望对接OA系统，以便同步客户档案' },
+            { id: 's70', actId: 'act10', relId: 'V1.5', title: '嵌入式组件', priority: '高', sp: 8, status: 'todo', desc: '作为客户，我希望在第三方系统使用客服，以便便捷咨询' },
+            { id: 's71', actId: 'act10', relId: 'V2.0', title: 'Webhook配置', priority: '低', sp: 5, status: 'todo', desc: '作为管理员，我希望配置Webhook，以便接收事件通知' },
+            { id: 's72', actId: 'act10', relId: 'V1.0', title: '三方登录', priority: '中', sp: 5, status: 'todo', desc: '作为客户，我希望使用钉钉登录，以便快速接入' }
+        ];
+
+        let currentActivities = []; let currentStories = []; let currentReleases = []; let currentPersonas = [];
+        let undoStack = []; let redoStack = []; let activeTab = 'map';
+
+        function pushToHistory() {
+            undoStack.push(JSON.stringify({ a: currentActivities, s: currentStories, r: currentReleases, p: currentPersonas }));
+            if (undoStack.length > MAX_HISTORY) undoStack.shift();
+            redoStack = []; updateButtons();
+        }
+        function undo() {
+            if (undoStack.length === 0) return;
+            redoStack.push(JSON.stringify({ a: currentActivities, s: currentStories, r: currentReleases, p: currentPersonas }));
+            const st = JSON.parse(undoStack.pop());
+            currentActivities = st.a; currentStories = st.s; currentReleases = st.r; currentPersonas = st.p;
+            save(); renderAll(); updateButtons(); showMessage('已撤销');
+        }
+        function redo() {
+            if (redoStack.length === 0) return;
+            undoStack.push(JSON.stringify({ a: currentActivities, s: currentStories, r: currentReleases, p: currentPersonas }));
+            const st = JSON.parse(redoStack.pop());
+            currentActivities = st.a; currentStories = st.s; currentReleases = st.r; currentPersonas = st.p;
+            save(); renderAll(); updateButtons(); showMessage('已重做');
+        }
+        function updateButtons() {
+            document.getElementById('btn-undo').disabled = undoStack.length === 0;
+            document.getElementById('btn-redo').disabled = redoStack.length === 0;
+        }
+
+        // --- Core ---
+        function save() {
+            localStorage.setItem(STORAGE_ACT_KEY, JSON.stringify(currentActivities));
+            localStorage.setItem(STORAGE_DATA_KEY, JSON.stringify(currentStories));
+            localStorage.setItem(STORAGE_REL_KEY, JSON.stringify(currentReleases));
+            localStorage.setItem(STORAGE_PER_KEY, JSON.stringify(currentPersonas));
+        }
+        function load() {
+            const ss = localStorage.getItem(STORAGE_DATA_KEY);
+            const sr = localStorage.getItem(STORAGE_REL_KEY);
+            const sa = localStorage.getItem(STORAGE_ACT_KEY);
+            const sp = localStorage.getItem(STORAGE_PER_KEY);
+            currentActivities = sa ? JSON.parse(sa) : [
+                { id: 'act1', name: '用户认证与授权', iconId: 'icon-4' },
+                { id: 'act2', name: '客户管理', iconId: 'icon-17' },
+                { id: 'act3', name: '客服团队管理', iconId: 'icon-2' },
+                { id: 'act4', name: '会话管理 (IM)', iconId: 'icon-9' },
+                { id: 'act5', name: '工单管理', iconId: 'icon-5' },
+                { id: 'act6', name: '服务群管理', iconId: 'icon-17' },
+                { id: 'act7', name: '知识库管理', iconId: 'icon-6' },
+                { id: 'act8', name: '数据统计分析', iconId: 'icon-7' },
+                { id: 'act9', name: '系统配置', iconId: 'icon-5' },
+                { id: 'act10', name: '系统集成对接', iconId: 'icon-11' }
+            ];
+            currentStories = ss ? JSON.parse(ss) : [...fullPRDStories]; 
+            currentReleases = sr ? JSON.parse(sr) : [
+                { id: 'MVP', name: 'MVP (S1-2)', sprint: '核心IM闭环', startDate: '2026-02-10', endDate: '2026-03-10', color: 'blue' },
+                { id: 'V1.0', name: 'V1.0 (S3-4)', sprint: '业务协同全面覆盖', startDate: '2026-03-11', endDate: '2026-04-11', color: 'green' },
+                { id: 'V1.5', name: 'V1.5 (S5-6)', sprint: '提效增质与实时看板', startDate: '2026-04-12', endDate: '2026-05-12', color: 'yellow' },
+                { id: 'V2.0', name: 'V2.0 (S7+)', sprint: '智能化管理与决策支持', color: 'red' }
+            ];
+            currentPersonas = sp ? JSON.parse(sp) : [
+                { id: 'p1', name: '客户', role: '公共卫生用户', need: '遇到问题能快速找到并联系上人工客服并得到响应。', color: 'blue' },
+                { id: 'p2', name: '客服人员', role: '一线服务坐席', need: '通过工具快速处理咨询，获取标准建议，提升处理效率。', color: 'green' },
+                { id: 'p3', name: '客服主管', role: '团队管理者', need: '监控团队负荷、分派人力、评估绩效优化运营。', color: 'purple' },
+                { id: 'p4', name: '管理员', role: '运维专家', need: '配置维护系统稳定性与权限安全可控。', color: 'orange' }
+            ];
+        }
+
+        function exportToFile() {
+            const data = { v: '1.69', activities: currentActivities, stories: currentStories, releases: currentReleases, personas: currentPersonas };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `StoryMap_PRD_Strict_v1.69.json`; a.click();
+            showMessage('备份导出成功');
+        }
+        function importFromFile(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (re) => {
+                try {
+                    const d = JSON.parse(re.target.result);
+                    pushToHistory();
+                    currentActivities = d.activities; currentStories = d.stories; currentReleases = d.releases; currentPersonas = d.personas;
+                    save(); renderAll(); showMessage('地图数据已从文件还原');
+                } catch(err) { showMessage('文件格式无效', true); }
+            };
+            reader.readAsText(file); e.target.value = '';
+        }
+
+        // --- UI ---
+        function showMessage(msg, isError = false) {
+            const el = document.getElementById('message-box');
+            el.innerHTML = msg;
+            el.classList.remove('hidden'); el.classList.add('flex');
+            if (isError) el.classList.add('bg-red-600'); else el.classList.remove('bg-red-600');
+            setTimeout(() => { el.classList.add('hidden'); el.classList.remove('flex'); }, 2500);
+        }
+
+        function openPersonaModal(id = null) {
+            const m = document.getElementById('modal-persona');
+            const delBtn = document.getElementById('btn-delete-persona');
+            // FIX: Restore element access and ensure existence
+            const editIdEl = document.getElementById('persona-edit-id');
+            const nameEl = document.getElementById('persona-name');
+            const roleEl = document.getElementById('persona-role');
+            const needEl = document.getElementById('persona-need');
+            
+            if (!editIdEl || !nameEl || !roleEl || !needEl) {
+                console.error("Critical Persona Modal IDs missing in HTML.");
+                return;
+            }
+
+            editIdEl.value = id || '';
+            if (id) {
+                const p = currentPersonas.find(it => it.id === id || it.name === id);
+                nameEl.value = p.name; roleEl.value = p.role; needEl.value = p.need;
+                document.querySelector(`input[name="persona-color"][value="${p.color}"]`).checked = true;
+                if(delBtn) delBtn.classList.remove('hidden');
+            } else {
+                nameEl.value = ''; roleEl.value = ''; needEl.value = '';
+                document.querySelector('input[name="persona-color"][value="blue"]').checked = true;
+                if(delBtn) delBtn.classList.add('hidden');
+            }
+            m.classList.remove('hidden');
+        }
+        function closePersonaModal() { document.getElementById('modal-persona').classList.add('hidden'); }
+        function savePersona() {
+            const n = document.getElementById('persona-name').value.trim(); if (!n) return;
+            pushToHistory();
+            const id = document.getElementById('persona-edit-id').value;
+            const data = { name: n, role: document.getElementById('persona-role').value, need: document.getElementById('persona-need').value, color: document.querySelector('input[name="persona-color"]:checked').value };
+            if (id) {
+                const idx = currentPersonas.findIndex(it => it.id === id || it.name === id);
+                Object.assign(currentPersonas[idx], data);
+            } else currentPersonas.push({ id: 'p-'+Date.now(), ...data });
+            save(); renderAll(); closePersonaModal();
+        }
+        function confirmDeletePersona() {
+            openConfirmModal('确定删除此角色画像吗？', () => { pushToHistory(); currentPersonas = currentPersonas.filter(it => it.id !== document.getElementById('persona-edit-id').value); save(); renderAll(); closePersonaModal(); });
+        }
+
+        function openActivityModal(id = null) {
+            initIconLibrary();
+            const m = document.getElementById('modal-activity');
+            const delBtn = document.getElementById('btn-delete-act');
+            document.getElementById('edit-act-id').value = id || '';
+            if (id) {
+                const a = currentActivities.find(it => it.id === id);
+                document.getElementById('act-name').value = a.name;
+                selectIcon(a.iconId || 'icon-0');
+                if(delBtn) delBtn.classList.remove('hidden');
+            } else {
+                document.getElementById('act-name').value = ''; selectIcon('icon-0');
+                if(delBtn) delBtn.classList.add('hidden');
+            }
+            m.classList.remove('hidden');
+        }
+        function closeActivityModal() { document.getElementById('modal-activity').classList.add('hidden'); }
+        function saveActivity() {
+            const n = document.getElementById('act-name').value.trim(); if (!n) return; pushToHistory();
+            const id = document.getElementById('edit-act-id').value;
+            if (id) {
+                const idx = currentActivities.findIndex(it => it.id === id);
+                currentActivities[idx] = { ...currentActivities[idx], name: n, iconId: selectedIconIdValue };
+            } else {
+                currentActivities.push({ id: 'act-' + Date.now(), name: n, iconId: selectedIconIdValue });
+            }
+            save(); renderAll(); closeActivityModal();
+        }
+        function confirmDeleteActivity() {
+            if (currentStories.some(s => s.actId === document.getElementById('edit-act-id').value)) return showMessage('列中尚存卡片', true);
+            pushToHistory(); currentActivities = currentActivities.filter(it => it.id !== document.getElementById('edit-act-id').value);
+            save(); renderAll(); closeActivityModal();
+        }
+
+        function openStoryModal(sid = null, aid = null, rid = null) {
+            const m = document.getElementById('modal-story');
+            document.getElementById('story-edit-id').value = sid || '';
+            document.getElementById('story-edit-act-id').value = aid || '';
+            document.getElementById('story-edit-rel-id').value = rid || '';
+            if (sid) {
+                const s = currentStories.find(it => it.id === sid);
+                document.getElementById('story-title').value = s.title; document.getElementById('story-sp').value = s.sp; document.getElementById('story-priority').value = s.priority; document.getElementById('story-status').value = s.status || 'todo'; document.getElementById('story-desc').value = s.desc || '';
+            } else {
+                document.getElementById('story-title').value = ''; document.getElementById('story-sp').value = '3';
+                document.getElementById('story-priority').value = '高'; document.getElementById('story-status').value = 'todo'; document.getElementById('story-desc').value = '';
+            }
+            m.classList.remove('hidden');
+        }
+        function closeStoryModal() { document.getElementById('modal-story').classList.add('hidden'); }
+        function saveStory() {
+            const t = document.getElementById('story-title').value.trim(); if (!t) return showMessage('标题必填', true);
+            pushToHistory();
+            const id = document.getElementById('story-edit-id').value;
+            const data = { title: t, sp: document.getElementById('story-sp').value, priority: document.getElementById('story-priority').value, status: document.getElementById('story-status').value, desc: document.getElementById('story-desc').value };
+            if (id) {
+                const idx = currentStories.findIndex(it => it.id === id);
+                Object.assign(currentStories[idx], data);
+            } else {
+                currentStories.push({ id: 's-'+Date.now(), actId: document.getElementById('story-edit-act-id').value, relId: document.getElementById('story-edit-rel-id').value, ...data });
+            }
+            save(); renderAll(); closeStoryModal();
+        }
+        function confirmDeleteStory() {
+            openConfirmModal('确定删除此故事卡片吗？', () => { pushToHistory(); currentStories = currentStories.filter(it => it.id !== document.getElementById('story-edit-id').value); save(); renderAll(); closeStoryModal(); });
+        }
+
+        function openReleaseModal(rid = null) {
+            const m = document.getElementById('modal-release');
+            document.getElementById('edit-rel-id').value = rid || '';
+            if (rid) {
+                const r = currentReleases.find(it => it.id === rid);
+                document.getElementById('rel-name').value = r.name; document.getElementById('rel-sprint').value = r.sprint;
+                document.getElementById('rel-start').value = r.startDate || ''; document.getElementById('rel-end').value = r.endDate || '';
+                document.querySelector(`input[name="rel-color"][value="${r.color}"]`).checked = true;
+            } else {
+                document.getElementById('rel-name').value = ''; document.getElementById('rel-sprint').value = ''; document.getElementById('rel-start').value = ''; document.getElementById('rel-end').value = '';
+                document.querySelector(`input[name="rel-color"][value="blue"]`).checked = true;
+            }
+            m.classList.remove('hidden');
+        }
+        function closeReleaseModal() { document.getElementById('modal-release').classList.add('hidden'); }
+        function saveRelease() {
+            const n = document.getElementById('rel-name').value.trim(); if(!n) return; pushToHistory();
+            const id = document.getElementById('edit-rel-id').value;
+            const data = { name: n, sprint: document.getElementById('rel-sprint').value, startDate: document.getElementById('rel-start').value, endDate: document.getElementById('rel-end').value, color: document.querySelector('input[name="rel-color"]:checked').value };
+            if(id) {
+                const idx = currentReleases.findIndex(it => it.id === id);
+                Object.assign(currentReleases[idx], data);
+            } else currentReleases.push({ id: 'rel-'+Date.now(), ...data });
+            save(); renderAll(); closeReleaseModal();
+        }
+        function openConfirmModal(msg, onConfirm) {
+            const m = document.getElementById('modal-confirm');
+            document.getElementById('confirm-text').textContent = msg;
+            document.getElementById('btn-confirm-execute').onclick = () => { onConfirm(); m.classList.add('hidden'); };
+            m.classList.remove('hidden');
+        }
+        function closeConfirmModal() { document.getElementById('modal-confirm').classList.add('hidden'); }
+
+        // --- View & Interaction ---
+        function switchTab(tab) {
+            activeTab = tab;
+            document.getElementById('tab-content-map').classList.toggle('hidden', tab !== 'map');
+            document.getElementById('tab-content-personas').classList.toggle('hidden', tab !== 'personas');
+            document.getElementById('btn-tab-map').className = `px-4 py-1.5 rounded-lg text-sm font-bold transition ${tab === 'map' ? 'tab-active' : 'bg-white text-slate-500 border border-slate-200'}`;
+            document.getElementById('btn-tab-personas').className = `px-4 py-1.5 rounded-lg text-sm font-bold transition ${tab === 'personas' ? 'tab-active' : 'bg-white text-slate-500 border border-slate-200'}`;
+            document.getElementById('map-controls').classList.toggle('hidden', tab !== 'map');
+            document.getElementById('persona-controls').classList.toggle('hidden', tab !== 'personas');
+        }
+
+        function cycleStatus(e, sid) {
+            e.stopPropagation(); pushToHistory();
+            const s = currentStories.find(it => it.id === sid);
+            const cycle = { 'todo': 'doing', 'doing': 'done', 'done': 'todo' };
+            s.status = cycle[s.status] || 'todo';
+            save(); renderAll();
+        }
+        function cyclePriority(e, sid) {
+            e.stopPropagation(); pushToHistory();
+            const s = currentStories.find(it => it.id === sid);
+            const cycle = { '高': '中', '中': '低', '低': '高' };
+            s.priority = cycle[s.priority] || '高';
+            save(); renderAll();
+        }
+
+        function handleDragStart(e) { e.target.classList.add('card-dragging'); e.dataTransfer.setData('text/plain', e.target.dataset.id); }
+        function handleDragEnd(e) { e.target.classList.remove('card-dragging'); document.querySelectorAll('.story-cell').forEach(el => el.classList.remove('drop-target-cell')); }
+        function handleDragOver(e) { e.preventDefault(); const cell = e.target.closest('.story-cell'); if (cell) cell.classList.add('drop-target-cell'); }
+        function handleDrop(e) {
+            e.preventDefault(); const cell = e.target.closest('.story-cell'); const sid = e.dataTransfer.getData('text/plain');
+            if (!cell || !sid) return;
+            pushToHistory();
+            const sidx = currentStories.findIndex(s => s.id === sid);
+            const moved = currentStories.splice(sidx, 1)[0];
+            moved.relId = cell.dataset.relId; moved.actId = cell.dataset.actId;
+            const targetCard = e.target.closest('.story-card');
+            if (targetCard && targetCard.dataset.id !== sid) {
+                const tidx = currentStories.findIndex(s => s.id === targetCard.dataset.id);
+                currentStories.splice(e.clientY < (targetCard.getBoundingClientRect().top + targetCard.offsetHeight/2) ? tidx : tidx+1, 0, moved);
+            } else currentStories.push(moved);
+            save(); renderAll();
+        }
+
+        function renderAll() {
+            document.getElementById('activity-headers').innerHTML = currentActivities.map(act => {
+                const lib = iconLibrary.find(i => i.id === act.iconId) || iconLibrary[0];
+                return `<div class="w-56 bg-indigo-700 text-white p-4 rounded-xl shadow-md flex flex-col items-center gap-2 text-center shrink-0 relative activity-header group"><div class="card-actions absolute top-2 right-2 opacity-0 transition z-20"><button onclick="openActivityModal('${act.id}')" class="p-1.5 bg-white/20 rounded-lg hover:bg-white/40 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button></div><svg class="w-7 h-7 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">${lib.icon}</svg><span class="font-black text-xs uppercase leading-tight select-none tracking-tight">${act.name}</span></div>`
+            }).join('');
+            
+            const cMap = { blue: 'border-blue-500 bg-blue-50', green: 'border-green-500 bg-green-50', yellow: 'border-yellow-500 bg-yellow-50', red: 'border-red-400 bg-red-50' };
+            document.getElementById('release-rows').innerHTML = currentReleases.map((rel, ridx) => `
+                <div class="flex gap-5 group/row text-left">
+                    <div class="w-60 shrink-0 sticky-col border-l-8 rounded-r-3xl p-6 flex flex-col justify-center ${cMap[rel.color] || cMap.blue} shadow-sm relative transition-all text-left">
+                        <div class="absolute top-3 right-3 opacity-0 group-hover/row:opacity-100 transition"><button onclick="openReleaseModal('${rel.id}')" class="p-2 bg-white border border-slate-100 rounded-xl shadow-xs hover:text-indigo-600 transition shadow-sm text-left"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button></div>
+                        <h3 class="font-black text-slate-800 text-[14px] leading-tight uppercase select-none mb-1 text-left">${rel.name}</h3>
+                        <p class="text-[10px] text-slate-500 font-bold mb-2 text-left tracking-tighter">${rel.sprint || ''}</p>
+                        ${(rel.startDate || rel.endDate) ? `<div class="mt-2 pt-2 border-t border-black/5 text-[9px] font-black text-slate-400 uppercase tracking-tighter text-left">${rel.startDate || '?'} / ${rel.endDate || '?'}</div>` : ''}
+                    </div>
+                    <div class="flex gap-5 text-left">
+                        ${currentActivities.map(act => {
+                            const stories = currentStories.filter(s => s.actId === act.id && s.relId === rel.id);
+                            return `<div class="w-56 min-h-[140px] bg-slate-200/20 rounded-2xl p-3 flex flex-col gap-3 border border-dashed border-slate-300 story-cell relative group/cell transition-colors hover:bg-slate-200/30" data-rel-id="${rel.id}" data-act-id="${act.id}" ondragover="handleDragOver(event)" ondrop="handleDrop(event)">
+                                ${stories.map(s => {
+                                    const pC = s.priority==='高'?'bg-red-50 text-red-600':s.priority==='中'?'bg-yellow-50 text-yellow-600':'bg-slate-50 text-slate-500';
+                                    const sIcon = s.status==='done'?'<svg class="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>' : 
+                                                  s.status==='doing'?'<div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_#3b82f6]"></div>' : 
+                                                  '<div class="w-2.5 h-2.5 border-2 border-slate-200 rounded-full"></div>';
+                                    return `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 story-card group/card ${s.status==='done'?'card-done':s.status==='doing'?'card-doing':''}" draggable="true" data-id="${s.id}" ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)">
+                                        <div class="flex justify-between items-start mb-2 text-left">
+                                            <span onclick="cyclePriority(event, '${s.id}')" class="cursor-pointer text-[10px] px-2 py-0.5 rounded-md border font-black ${pC}">${s.priority}</span>
+                                            <div class="flex gap-1 items-center">
+                                                <div onclick="cycleStatus(event, '${s.id}')" class="status-pill cursor-pointer">${sIcon}</div>
+                                                <button onclick="openStoryModal('${s.id}')" class="card-actions p-1 text-slate-300 hover:text-indigo-600 transition text-left"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3.5" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+                                            </div>
+                                        </div>
+                                        <div class="story-tooltip ${ridx===0?'tooltip-down':'tooltip-up'} text-left"><div class="font-black text-xs border-b border-white/10 pb-3 mb-3 uppercase text-indigo-300 tracking-widest text-left text-left">标准用户故事描述</div><p class="font-medium italic leading-relaxed text-slate-100 text-left text-left text-left">${s.desc || '暂无描述内容。'}</p></div>
+                                        <h4 class="text-[14px] font-black text-slate-800 leading-tight mb-2 select-none text-left text-left">${s.title}</h4>
+                                        <div class="flex justify-between items-center pt-2 border-t border-slate-50 mt-auto text-left text-left">
+                                            <span class="text-[10px] text-slate-300 font-mono tracking-tighter uppercase font-black text-left text-left">SP: ${s.sp}</span>
+                                            <div onclick="cycleStatus(event, '${s.id}')" class="status-pill p-1.5 px-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-1.5 transition hover:bg-white shadow-xs text-left">
+                                                <span class="text-[9px] font-black uppercase text-slate-400 text-left">${s.status==='done'?'完成':s.status==='doing'?'进行':'待办'}</span>
+                                            </div>
+                                        </div>
+                                    </div>`}).join('')}
+                                <button onclick="openStoryModal(null, '${act.id}', '${rel.id}')" class="w-full py-3 flex items-center justify-center rounded-xl border-2 border-dashed border-slate-200 text-slate-300 opacity-0 group-hover/cell:opacity-100 hover:bg-white hover:text-indigo-600 transition-all mt-auto text-xl font-bold text-center">+</button>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>`).join('');
+
+            const perC = { blue: 'bg-blue-100 text-blue-800', green: 'bg-green-100 text-green-800', purple: 'bg-purple-100 text-purple-800', orange: 'bg-orange-100 text-orange-800' };
+            document.getElementById('persona-grid').innerHTML = currentPersonas.map(p => `
+                <div class="bg-white rounded-[2.5rem] shadow-sm p-8 border border-gray-100 flex gap-8 items-start hover:shadow-xl transition-all group persona-card relative text-left">
+                    <div class="card-actions absolute top-6 right-6 opacity-0 transition z-50 text-left">
+                        <button onclick="openPersonaModal('${p.id || p.name}')" class="p-3 bg-slate-100 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition shadow-xs text-left">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                    </div>
+                    <div class="p-7 rounded-[2rem] ${perC[p.color] || perC.blue} shadow-inner transition-transform group-hover:rotate-2 text-left">
+                        <svg class="w-12 h-12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    </div>
+                    <div class="flex-1 pt-1 text-left">
+                        <h3 class="text-2xl font-black text-slate-900 mb-1 text-left">${p.name}</h3><p class="text-sm font-bold text-indigo-600 uppercase tracking-widest opacity-80 text-left">${p.role}</p>
+                        <div class="bg-slate-50/80 rounded-2xl p-5 border border-slate-200/50 shadow-sm mt-4 text-left">
+                             <p class="text-[15px] text-slate-600 leading-relaxed font-medium text-left"><span class="text-slate-900 font-black mr-2 uppercase text-[10px] bg-white border px-2 py-0.5 rounded shadow-sm">Goals:</span>${p.need}</p>
+                        </div>
+                    </div>
+                </div>`).join('');
+            updateButtons();
+        }
+
+        window.addEventListener('keydown', (e) => { 
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { if (e.shiftKey) redo(); else undo(); e.preventDefault(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'y') { redo(); e.preventDefault(); }
+        });
+        window.onload = () => { load(); renderAll(); };
+    </script>
+</body>
+</html>
